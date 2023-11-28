@@ -1,0 +1,202 @@
+---
+title: "Global-Internet-User"
+author: "Mari Hirota"
+date: "2023-07-03"
+output: html_document
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(plotly)
+library(ggrepel)
+library(dplyr)
+library(socviz)
+library(gapminder)
+
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width = 8, fig.height = 5)
+knitr::opts_chunk$set(message = FALSE, warnings = FALSE)
+
+```
+
+For this final project, I use a data set called Global internet User. It is a data set that show us how many users are using the internet throughout 40 years. The data contain, country, country code, cellular subscription, internet user in number and in percentage. The research question that I have for this data set is what is the internet user number look like through out the year and how much different it is in different continent. Also, how much percentage of people have access of the internet. 
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE}
+internet <- read.csv("internet.csv")
+country <- read.csv("world_population.csv")
+
+internet <- internet %>% rename(country = Entity)
+country <- country %>%
+  mutate(country = Country.Territory) %>%
+  select(country, Continent) %>%
+  rename(continent = Continent)
+
+internet_cont <- inner_join(internet, country, by = "country") %>% distinct()
+
+#head(internet_cont)
+#head(continent)
+```
+
+In this linear graph, it is showing the sum of all internet user in each year. As year passed, the internet user start to grow higher and higher but as it is closer to recent year the slope of the growth is steeper. Which show no sign of going down at all as year progress. The area that is showing steep linear line is in 2019 and 2020. It is the time that COVID-19 happen and people were in quarantine and use more internet. 
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE}
+#1. graph that show the world user of internet as year progress
+#d. Build a (simple) linear model and generate predictions using the predict() function, then graph the predictions with a confidence interval (see figure 6.4 on page 145, section 6.4)
+world_data <- internet %>% 
+  select(country, Year, No..of.Internet.Users) %>% 
+  filter(country == "World")
+
+world <- ggplot(data = world_data, mapping = aes(x = Year, y = No..of.Internet.Users))
+#how to use interval in this case
+#pred_num <- predict(object = No..of.Internet.Users,newdata = world_data,interval = "confidence")
+#subtitle is not showing
+world1 <- world + 
+  geom_line() + 
+  geom_point() + 
+  scale_y_continuous(breaks = c(0, 1000000000, 2000000000, 3000000000, 4000000000), labels = c("0", "1B", "2B", "3B", "4B")) +
+  labs(y = "Internet User", title = "Global Internet User were growing faster in earlier year", subtitle = "1980-2020") +
+  annotate(geom = "rect", xmin = 2016, xmax = 2020, ymin = 3500000000, ymax = 4700000000, fill = "red", alpha = 0.2) +
+  annotate(geom = "text", x = 2016, y = 4200000000, label = "Rapidly growing", size = 3)
+
+world1
+#ggplotly(world1)
+```
+
+In this graph, I used multiple layer like linear line to show the average and scatter plot to show the data for each country. I use the filter to show the top 7 country that have the most access to internet. The y axis is telling us the number of subscription people have in 100 people. It is over 100 because one person can have more than one subscription. The x axis is the percentage of the population. This graph suggesting that in Hong Kong, most of the population have access to the internet and one person have multiple cellular description. 
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE}
+#2. top 7 country that has the most access to internet in 2020 - think of better name
+# A graph with multiple layers highlighting a specific subset of your data (see figure 8.13 in section 8.2, on page 207)
+int_2020 <- internet_cont %>% filter(Year == 2020, Internet.Users... > 0.0000)
+
+internet1_2020 <- ggplot(data = int_2020, mapping = aes(x = Internet.Users...,y = Cellular.Subscription,label = factor(country))) 
+  
+internet2_2020 <- internet1_2020 + geom_smooth(method = "lm", se = FALSE, color = "gray80") +
+  geom_point(alpha = 0.2) +
+  geom_point(data = subset(int_2020, Cellular.Subscription > 162.8000), mapping = aes(x = Internet.Users...,y = Cellular.Subscription, color = continent)) +
+  guides(color = guide_legend(title = "Continent")) +
+  theme(legend.position = "bottom")
+
+internet3_2020 <- internet2_2020 + labs(x = "Internet Users", y = "Cellular Subscription per 100 people", title = "Top 7 Country that has the Most Access to Internet in 2020")
+  
+internet_2020 <- internet3_2020 + geom_text_repel(data = subset(internet_cont, Year == 2020 & Cellular.Subscription > 162.8000 & Internet.Users... > 0.0000), size = 2, aes( label = country)) +
+  annotate(geom = "text", x = 0, y = 290, label = "This number can get over 100 when the average person has \n more than one subscription to a mobile service.", hjust = 0, size = 2.5) +
+  scale_x_continuous(breaks = c(0, 25, 50, 75, 100), labels = c("0%" , "25%", "50%", "75%", "100%"))
+
+internet_2020
+# geom text repel does not work with ggplotly
+#ggplotly(internet_2020)
+```
+
+
+In this graph is also a line graph but show all the data for every country and is facet wrap by continent. So that the line will not be too overlapping. Because of Asia continent, it makes other continent look like they are few internet user. I seperated the graph to see the other graph line better. It seems like the number of internet user is correlate with the number of population. China have the most population so they have larger number of internet user. 
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE}
+#3. group by continent to see which continent use the most internet 
+#(a. Group the data by a category and create a small multiples graph using facet)
+
+no_asiaandna <- internet_cont %>% filter(!continent %in% c("Asia", "North America")) 
+asia <- internet_cont %>% filter(continent %in% "Asia" & Year > 2000 & No..of.Internet.Users > 0)
+na <- internet_cont %>% filter(continent %in% "North America")
+
+overall <- ggplot(data = internet_cont, mapping = aes(x = Year,y = No..of.Internet.Users, group = country, color = country))
+
+overall <- overall + geom_line() + 
+  guides(color = FALSE) +
+  facet_wrap(~continent, ncol = 2) +
+  scale_y_continuous(breaks = c(200000000, 400000000, 600000000, 800000000, 1000000000), labels = c("200M" , "400M", "600M", "800M", "1B")) +
+  labs(x = "Year", y = "Internet Users", title = "Internet User in the Past 20 Years by Continent")
+
+ggplotly(overall)
+
+
+```
+
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE}
+#3. group by continent to see which continent use the most internet 
+#(a. Group the data by a category and create a small multiples graph using facet)
+p <- ggplot(data = subset(no_asiaandna, Year > 2000 & No..of.Internet.Users > 0), mapping = aes(x = Year,y = No..of.Internet.Users, group = country, color = country))
+
+four_cont <- p + geom_line() + 
+  facet_wrap(~continent, ncol = 2) + 
+  guides(color = FALSE) + 
+  scale_y_continuous(breaks = c(25000000, 50000000, 75000000, 100000000, 150000000), labels = c("25M" , "50M", "75M", "100M", "150M")) +
+  labs(x = "Year", y = "Internet Users", title = "Internet User in the Past 20 Years of the Four Continenet")
+
+ggplotly(four_cont)
+```
+
+
+
+
+
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE}
+#3. group by continent to see which continent use the most internet 
+#(a. Group the data by a category and create a small multiples graph using facet)
+asia_g <- ggplot(data = subset(asia, Year > 2000 & No..of.Internet.Users > 0), mapping = aes(x = Year,y = No..of.Internet.Users, group = country, color = country))
+
+asia_g <- asia_g + geom_line() + 
+  guides(color = FALSE) +
+  facet_wrap(~continent, ncol = 1) +
+  scale_y_continuous(breaks = c(200000000, 400000000, 600000000, 800000000, 1000000000), labels = c("200M" , "400M", "600M", "800M", "1B")) +
+  labs(x = "Year", y = "Internet Users", title = "Internet User in Asia in the Past 20 Years")
+
+ggplotly(asia_g)
+
+```
+
+
+
+
+
+
+
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE}
+#3. group by continent to see which continent use the most internet 
+#(a. Group the data by a category and create a small multiples graph using facet)
+na_g <- ggplot(data = subset(na, Year > 2000 & No..of.Internet.Users > 0), mapping = aes(x = Year,y = No..of.Internet.Users, group = country, color = country))
+
+na_g <- na_g + geom_line() + 
+  guides(color = FALSE) +
+  facet_wrap(~continent, ncol = 1) +
+  scale_y_continuous(breaks = c(100000000, 200000000, 300000000), labels = c("100M" , "200M", "300M")) +
+  labs(x = "Year", y = "Internet Users", title = "Internet User in North America in the Past 20 Years")
+
+ggplotly(na_g)
+
+```
+
+This is the global map of the internet user in 2020. As you can see there are some country that is missing. It is because the value of the country in two of the data set I am using is not the same. So, when I left joined them together, they do not recognize it. When I see that graph, it make me feel like other country barely have much internet users. It would be interest to see, if I change the filling to the percentage of the population that have access to the internet. We might see more purple and red. 
+
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE}
+#4.
+# create data for world coordinates using 
+# map_data() function
+world_coordinates <- map_data("world")
+world_coordinates <- world_coordinates %>% rename(country = region)
+
+#head(internet_cont)
+#, plot.title = "# of Internet User in 2020"
+#guides(color = guide_legend(title = "No of Internet User 2020"))
+
+
+internet_cont["country"][internet_cont["country"] == "United States"] <- "USA"
+
+internet_world <- left_join(world_coordinates, internet_cont)
+internet_world <- internet_world %>% filter(Year == 2020)
+
+p <- ggplot(subset(internet_world, Year = 2020), aes(x = long, y = lat, group = group, fill = No..of.Internet.Users))
+p1 <- p + geom_polygon(color = "gray90", linewidth = 0.1) + 
+  scale_fill_gradient(low = "#2E74C0", high = "#CB454A", labels=c("0M", "250M", "500M", "750M", "1B")) +
+  labs(title = "Global Internet User in 2020")
+ggplotly(p1)
+```
+
+
+
